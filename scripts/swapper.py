@@ -139,7 +139,8 @@ def swap_face(
         else:
             logger.info("No source face found")
     result_image.save(fn.name)
-    return ImageResult(path=fn.name)
+    logger.info("Roop save result image: %s", fn.name)
+    return ImageResult(img=result_image)
 
 def swap_face_v2(
     source_img: Image.Image,

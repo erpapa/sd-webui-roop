@@ -6,11 +6,15 @@ from PIL import Image
 from fastapi import FastAPI, Body
 from typing import List
 
+from modules import shared
+from modules.upscaler import Upscaler, UpscalerData
+from modules.face_restoration import FaceRestoration
 from modules.api.models import *
 from modules.api import api
 
 from scripts.cimage import get_models
 from scripts.swapper import UpscaleOptions, ImageResult, swap_face_v2
+from scripts.roop_logging import logger
 
 def decode_to_pil(image):
     if os.path.exists(image):
@@ -42,6 +46,18 @@ def to_base64_nparray(encoding: str):
     pil = api.decode_base64_to_image(encoding)
     return np.array(pil).astype('uint8')
 
+def upscaler() -> UpscalerData:
+    for upscaler in shared.sd_upscalers:
+        if upscaler.name == "LDSR":
+            return upscaler
+    return None
+
+def face_restorer() -> FaceRestoration:
+    for face_restorer in shared.face_restorers:
+        if face_restorer.name() == "CodeFormer":
+            return face_restorer
+    return None
+
 def roop_api(_: gr.Blocks, app: FastAPI):
     @app.get("/roop/version")
     async def version():
@@ -62,7 +78,12 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         if len(roop_model) == 0:
             return {"msg": "No Model", "info": "Failed"}
 
-        upscale_options = UpscaleOptions()
+        logger.info(f"Roop app.post：/roop/detect，roop_model：%s", roop_model)
+        upscale_options = UpscaleOptions(scale=1,
+                                         upscaler=upscaler(),
+                                         upscale_visibility=1.0,
+                                         face_restorer=face_restorer(),
+                                         restorer_visibility=1.0)
         source_img: Image.Image = decode_to_pil(roop_source_image)
         target_img: Image.Image = decode_to_pil(roop_target_image)
         result: ImageResult = swap_face_v2(
@@ -90,7 +111,12 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         if len(roop_model) == 0:
             return {"msg": "No Model", "info": "Failed"}
 
-        upscale_options = UpscaleOptions()
+        logger.info(f"Roop app.post：/roop/batch_detect，roop_model：%s", roop_model)
+        upscale_options = UpscaleOptions(scale=1,
+                                         upscaler=upscaler(),
+                                         upscale_visibility=1.0,
+                                         face_restorer=face_restorer(),
+                                         restorer_visibility=1.0)
         source_img: Image.Image = decode_to_pil(roop_source_image)
         result_imgs: List = []
         for img_str in roop_target_images:
