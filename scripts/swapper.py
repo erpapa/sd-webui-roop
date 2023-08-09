@@ -1,20 +1,16 @@
-import copy
-import math
 import os
-import tempfile
-from dataclasses import dataclass
-from typing import List, Union, Dict, Set, Tuple
-
 import cv2
-import numpy as np
-from PIL import Image
-
 import insightface
-import onnxruntime
-from scripts.cimage import convert_to_sd
+import numpy as np
+
+from PIL import Image
+from dataclasses import dataclass
+from typing import Union, Dict, Set
 
 from modules.face_restoration import FaceRestoration, restore_faces
 from modules.upscaler import Upscaler, UpscalerData
+
+from scripts.cimage import convert_to_sd
 from scripts.roop_logging import logger
 
 providers = ["CPUExecutionProvider"]
@@ -89,12 +85,16 @@ def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
 
 @dataclass
 class ImageResult:
+    img: Image.Image = None
     path: Union[str, None] = None
     similarity: Union[Dict[int, float], None] = None  # face, 0..1
 
     def image(self) -> Union[Image.Image, None]:
+        if self.img:
+            return self.img
         if self.path:
-            return Image.open(self.path)
+            self.img = Image.open(self.path)
+            return self.img
         return None
 
 
@@ -140,3 +140,44 @@ def swap_face(
             logger.info("No source face found")
     result_image.save(fn.name)
     return ImageResult(path=fn.name)
+
+def swap_face_v2(
+    source_img: Image.Image,
+    target_img: Image.Image,
+    model: Union[str, None] = None,
+    faces_index: Set[int] = {0},
+    upscale_options: Union[UpscaleOptions, None] = None,
+) -> ImageResult:
+    result_image = target_img
+    if model is not None:
+        if isinstance(source_img, str):  # source_img is a base64 string
+            import base64, io
+            if 'base64,' in source_img:  # check if the base64 string has a data URL scheme
+                base64_data = source_img.split('base64,')[-1]
+                img_bytes = base64.b64decode(base64_data)
+            else:
+                # if no data URL scheme, just decode
+                img_bytes = base64.b64decode(source_img)
+            source_img = Image.open(io.BytesIO(img_bytes))
+        source_img = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
+        target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
+        source_face = get_face_single(source_img, face_index=0)
+        if source_face is not None:
+            result = target_img
+            model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
+            face_swapper = getFaceSwapModel(model_path)
+
+            for face_num in faces_index:
+                target_face = get_face_single(target_img, face_index=face_num)
+                if target_face is not None:
+                    result = face_swapper.get(result, target_face, source_face)
+                else:
+                    logger.info(f"No target face found for {face_num}")
+
+            result_image = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+            if upscale_options is not None:
+                result_image = upscale_image(result_image, upscale_options)
+        else:
+            logger.info("No source face found")
+    # result_image.save(fn.name)
+    return ImageResult(img=result_image)

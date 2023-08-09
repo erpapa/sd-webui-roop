@@ -1,6 +1,6 @@
-import os
 import gradio as gr
-import modules.scripts as scripts
+
+from PIL import Image
 from modules.upscaler import Upscaler, UpscalerData
 from modules import scripts, shared, images, scripts_postprocessing
 from modules.processing import (
@@ -8,21 +8,12 @@ from modules.processing import (
     StableDiffusionProcessingImg2Img,
 )
 from modules.shared import cmd_opts, opts, state
-from PIL import Image
-import glob
 from modules.face_restoration import FaceRestoration
 
+from scripts.cimage import get_models
 from scripts.roop_logging import logger
-from scripts.swapper import UpscaleOptions, swap_face, ImageResult
+from scripts.swapper import UpscaleOptions, ImageResult, swap_face
 from scripts.roop_version import version_flag
-import os
-
-
-def get_models():
-    models_path = os.path.join(scripts.basedir(), "models" + os.path.sep + "roop" + os.path.sep + "*")
-    models = glob.glob(models_path)
-    models = [x for x in models if x.endswith(".onnx") or x.endswith(".pth")]
-    return models
 
 
 class FaceSwapScript(scripts.Script):
