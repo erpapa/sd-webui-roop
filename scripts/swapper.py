@@ -10,10 +10,15 @@ from typing import Union, Dict, Set
 from modules.face_restoration import FaceRestoration, restore_faces
 from modules.upscaler import Upscaler, UpscalerData
 
-from scripts.cimage import convert_to_sd
+from scripts.cimage import detect_image
 from scripts.roop_logging import logger
 
-providers = ["CPUExecutionProvider"]
+CURRENT_FS_MODEL = None
+CURRENT_FS_MODEL_PATH = None
+FACE_MODEL_NAME = None
+FACE_ANALYSER = None
+FACE_DET_SIZE = (0, 0)
+PROVIDERS = ['CUDAExecutionProvider', 'CPUExecutionProvider']
 
 
 @dataclass
@@ -24,18 +29,29 @@ class UpscaleOptions:
     face_restorer: FaceRestoration = None
     restorer_visibility: float = 0.5
 
-FS_MODEL = None
-CURRENT_FS_MODEL_PATH = None
 
-
-def getFaceSwapModel(model_path: str):
-    global FS_MODEL
+def get_face_swap_model(model_path: str):
+    global CURRENT_FS_MODEL
     global CURRENT_FS_MODEL_PATH
     if CURRENT_FS_MODEL_PATH is None or CURRENT_FS_MODEL_PATH != model_path:
         CURRENT_FS_MODEL_PATH = model_path
-        FS_MODEL = insightface.model_zoo.get_model(model_path, providers=providers)
+        CURRENT_FS_MODEL = insightface.model_zoo.get_model(model_path, providers=PROVIDERS)
 
-    return FS_MODEL
+    return CURRENT_FS_MODEL
+
+
+def get_face_analyser(name: str, det_size: tuple):
+    global FACE_MODEL_NAME
+    global FACE_ANALYSER
+    global FACE_DET_SIZE
+    if FACE_MODEL_NAME is None or FACE_MODEL_NAME != name:
+        FACE_MODEL_NAME = name
+        FACE_ANALYSER = insightface.app.FaceAnalysis(name=name, providers=PROVIDERS)
+    if FACE_DET_SIZE[0] != det_size[0] or FACE_DET_SIZE[1] != det_size[1]:
+        FACE_DET_SIZE = det_size
+        FACE_ANALYSER.prepare(ctx_id=0, det_size=det_size)
+
+    return FACE_ANALYSER
 
 
 def upscale_image(image: Image, upscale_options: UpscaleOptions):
@@ -69,8 +85,7 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
 
 
 def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
-    face_analyser = insightface.app.FaceAnalysis(name="buffalo_l", providers=providers)
-    face_analyser.prepare(ctx_id=0, det_size=det_size)
+    face_analyser = get_face_analyser(name="buffalo_l", det_size=det_size)
     face = face_analyser.get(img_data)
 
     if len(face) == 0 and det_size[0] > 320 and det_size[1] > 320:
@@ -104,52 +119,15 @@ def swap_face(
     model: Union[str, None] = None,
     faces_index: Set[int] = {0},
     upscale_options: Union[UpscaleOptions, None] = None,
+    detect_porn: bool = True,
 ) -> ImageResult:
     result_image = target_img
-    converted = convert_to_sd(target_img)
-    scale, fn = converted[0], converted[1]
-    if model is not None and not scale:
-        if isinstance(source_img, str):  # source_img is a base64 string
-            import base64, io
-            if 'base64,' in source_img:  # check if the base64 string has a data URL scheme
-                base64_data = source_img.split('base64,')[-1]
-                img_bytes = base64.b64decode(base64_data)
-            else:
-                # if no data URL scheme, just decode
-                img_bytes = base64.b64decode(source_img)
-            source_img = Image.open(io.BytesIO(img_bytes))
-        source_img = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
-        target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
-        source_face = get_face_single(source_img, face_index=0)
-        if source_face is not None:
-            result = target_img
-            model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
-            face_swapper = getFaceSwapModel(model_path)
+    detect_flag = False
+    if detect_porn:
+        detect_flag = detect_image(target_img)
+    if detect_flag:
+        return ImageResult(img=result_image)
 
-            for face_num in faces_index:
-                target_face = get_face_single(target_img, face_index=face_num)
-                if target_face is not None:
-                    result = face_swapper.get(result, target_face, source_face)
-                else:
-                    logger.info(f"No target face found for {face_num}")
-
-            result_image = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
-            if upscale_options is not None:
-                result_image = upscale_image(result_image, upscale_options)
-        else:
-            logger.info("No source face found")
-    result_image.save(fn.name)
-    logger.info("Roop save result image: %s", fn.name)
-    return ImageResult(img=result_image)
-
-def swap_face_v2(
-    source_img: Image.Image,
-    target_img: Image.Image,
-    model: Union[str, None] = None,
-    faces_index: Set[int] = {0},
-    upscale_options: Union[UpscaleOptions, None] = None,
-) -> ImageResult:
-    result_image = target_img
     if model is not None:
         if isinstance(source_img, str):  # source_img is a base64 string
             import base64, io
@@ -166,7 +144,7 @@ def swap_face_v2(
         if source_face is not None:
             result = target_img
             model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
-            face_swapper = getFaceSwapModel(model_path)
+            face_swapper = get_face_swap_model(model_path)
 
             for face_num in faces_index:
                 target_face = get_face_single(target_img, face_index=face_num)
