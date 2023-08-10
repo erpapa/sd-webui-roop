@@ -71,7 +71,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         return {"version": "0.0.2"}
 
     @app.post("/roop/swap_face")
-    async def detect(
+    async def swap_face(
         roop_source_image: str = Body("", title='Roop Source Image'),
         roop_target_image: str = Body("", title='Roop Target Image'),
         roop_model: str = Body("", title='Roop Model Path'),
@@ -117,7 +117,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         return {"image": result_str, "info": "Success"}
 
     @app.post("/roop/batch_swap_face")
-    async def batch_detect(
+    async def batch_swap_face(
         roop_source_image: str = Body("", title='Roop Source Image'),
         roop_target_images: List[str] = Body([], title='Roop Target Images'),
         roop_model: str = Body("", title='Roop Model Path'),
