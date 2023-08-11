@@ -67,11 +67,11 @@ def face_restorer(name: str) -> FaceRestoration:
 
 def roop_api(_: gr.Blocks, app: FastAPI):
     @app.get("/roop/version")
-    async def version():
+    async def roop_version():
         return {"version": "0.0.2"}
 
     @app.post("/roop/swap_face")
-    async def swap_face(
+    async def roop_swap_face(
         roop_source_image: str = Body("", title='Roop Source Image'),
         roop_target_image: str = Body("", title='Roop Target Image'),
         roop_model: str = Body("", title='Roop Model Path'),
@@ -88,7 +88,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
             return {"msg": "No Target Image", "info": "Failed"}
         if roop_model is None or len(roop_model) == 0:
             roop_model = get_models()[0]
-        if len(roop_model) == 0:
+        if roop_model is None or len(roop_model) == 0:
             return {"msg": "No Model", "info": "Failed"}
         if roop_scale < 1 or roop_scale > 8:
             roop_scale = 1
@@ -117,7 +117,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         return {"image": result_str, "info": "Success"}
 
     @app.post("/roop/batch_swap_face")
-    async def batch_swap_face(
+    async def roop_batch_swap_face(
         roop_source_image: str = Body("", title='Roop Source Image'),
         roop_target_images: List[str] = Body([], title='Roop Target Images'),
         roop_model: str = Body("", title='Roop Model Path'),
@@ -134,7 +134,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
             return {"msg": "No Target Images", "info": "Failed"}
         if roop_model is None or len(roop_model) == 0:
             roop_model = get_models()[0]
-        if len(roop_model) == 0:
+        if roop_model is None or len(roop_model) == 0:
             return {"msg": "No Model", "info": "Failed"}
         if roop_scale < 1 or roop_scale > 8:
             roop_scale = 1
