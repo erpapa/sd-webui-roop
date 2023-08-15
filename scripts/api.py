@@ -18,7 +18,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         return {"version": f"{version_flag}"}
 
     @app.post("/roop/face_detect")
-    async def roop_swap_face(
+    async def roop_face_detect(
         source_image: str = Body("", title='Roop Source Image'),
     ):
         if len(source_image) == 0:
