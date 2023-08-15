@@ -4,13 +4,13 @@ import insightface
 import numpy as np
 
 from PIL import Image
-from dataclasses import dataclass
 from typing import Union, Dict, Set
+from dataclasses import dataclass
 
 from modules.face_restoration import FaceRestoration, restore_faces
 from modules.upscaler import Upscaler, UpscalerData
 
-from scripts.cimage import detect_image
+from scripts.cimage import detect_image, decode_to_pil
 from scripts.roop_logging import logger
 
 CURRENT_FS_MODEL = None
@@ -119,25 +119,18 @@ def swap_face(
     model: Union[str, None] = None,
     faces_index: Set[int] = {0},
     upscale_options: Union[UpscaleOptions, None] = None,
-    detect_porn: bool = True,
+    nsfw_filter: bool = True,
 ) -> ImageResult:
     result_image = target_img
     detect_flag = False
-    if detect_porn:
+    if nsfw_filter:
         detect_flag = detect_image(target_img)
     if detect_flag:
         return ImageResult(img=result_image)
 
     if model is not None:
         if isinstance(source_img, str):  # source_img is a base64 string
-            import base64, io
-            if 'base64,' in source_img:  # check if the base64 string has a data URL scheme
-                base64_data = source_img.split('base64,')[-1]
-                img_bytes = base64.b64decode(base64_data)
-            else:
-                # if no data URL scheme, just decode
-                img_bytes = base64.b64decode(source_img)
-            source_img = Image.open(io.BytesIO(img_bytes))
+            source_img = decode_to_pil(source_img)
         source_img = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
         target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
         source_face = get_face_single(source_img, face_index=0)
@@ -158,5 +151,5 @@ def swap_face(
                 result_image = upscale_image(result_image, upscale_options)
         else:
             logger.info("No source face found")
-    # result_image.save(fn.name)
+
     return ImageResult(img=result_image)
