@@ -30,7 +30,7 @@ def get_first_model():
     model = "inswapper_128.onnx"
     models = get_models()
     if len(models) > 0:
-        model = model[0]
+        model = models[0]
     return model
 
 
