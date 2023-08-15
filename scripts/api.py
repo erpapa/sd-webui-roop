@@ -1,3 +1,5 @@
+import cv2
+import numpy as np
 import gradio as gr
 
 from PIL import Image
@@ -6,7 +8,7 @@ from fastapi import FastAPI, Body
 
 from scripts.cimage import get_first_model, find_upscaler, find_face_restorer
 from scripts.cimage import decode_to_pil, encode_to_base64
-from scripts.swapper import UpscaleOptions, ImageResult, swap_face
+from scripts.swapper import UpscaleOptions, ImageResult, swap_face, get_face_single
 from scripts.roop_logging import logger
 from scripts.roop_version import version_flag
 
@@ -14,6 +16,22 @@ def roop_api(_: gr.Blocks, app: FastAPI):
     @app.get("/roop/version")
     async def roop_version():
         return {"version": f"{version_flag}"}
+
+    @app.post("/roop/face_detect")
+    async def roop_swap_face(
+        source_image: str = Body("", title='Roop Source Image'),
+    ):
+        if len(source_image) == 0:
+            return {"msg": "No Source Image", "info": "Failed"}
+
+        source_img: Image.Image = decode_to_pil(source_image)
+        img_data = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
+        img_face = get_face_single(img_data, face_index=0)
+
+        if img_face is None:
+            return {"msg": "No Faces Detected", "info": "Failed"}
+
+        return {"msg": "Face Detected", "info": "Success"}
 
     @app.post("/roop/swap_face")
     async def roop_swap_face(
