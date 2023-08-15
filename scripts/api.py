@@ -20,16 +20,23 @@ def roop_api(_: gr.Blocks, app: FastAPI):
     @app.post("/roop/face_detect")
     async def roop_face_detect(
         source_image: str = Body("", title='Roop Source Image'),
+        target_image: str = Body("", title='Roop Target Image'),
     ):
         if len(source_image) == 0:
             return {"msg": "No Source Image", "info": "Failed"}
 
         source_img: Image.Image = decode_to_pil(source_image)
-        img_data = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
-        img_face = get_face_single(img_data, face_index=0)
+        source_data = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
+        source_face = get_face_single(source_data, face_index=0)
+        if source_face is None:
+            return {"msg": "Source Image No Faces", "info": "Failed"}
 
-        if img_face is None:
-            return {"msg": "No Faces Detected", "info": "Failed"}
+        if len(target_image) > 0:
+            target_img: Image.Image = decode_to_pil(target_image)
+            target_data = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
+            target_face = get_face_single(target_data, face_index=0)
+            if target_face is None:
+                return {"msg": "Target Image No Faces", "info": "Failed"}
 
         return {"msg": "Face Detected", "info": "Success"}
 
