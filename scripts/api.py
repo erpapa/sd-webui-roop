@@ -8,14 +8,15 @@ from fastapi import FastAPI, Body
 
 from scripts.cimage import get_first_model, find_upscaler, find_face_restorer
 from scripts.cimage import decode_to_pil, encode_to_base64
-from scripts.swapper import UpscaleOptions, ImageResult, swap_face, get_face_single
+from scripts.swapper import UpscaleOptions, ImageResult, swap_face, get_faces
 from scripts.roop_logging import logger
 from scripts.roop_version import version_flag
+
 
 def roop_api(_: gr.Blocks, app: FastAPI):
     @app.get("/roop/version")
     async def roop_version():
-        return {"version": f"{version_flag}"}
+        return {"version": f"{version_flag}", "msg": "Success", "state": 200}
 
     @app.post("/roop/face_detect")
     async def roop_face_detect(
@@ -23,22 +24,29 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         target_image: str = Body("", title='Roop Target Image'),
     ):
         if len(source_image) == 0:
-            return {"msg": "No Source Image", "info": "Failed"}
-
+            return {"msg": "No Source Image", "state": 404}
         source_img: Image.Image = decode_to_pil(source_image)
         source_data = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
-        source_face = get_face_single(source_data, face_index=0)
-        if source_face is None:
-            return {"msg": "Source Image No Faces", "info": "Failed"}
+        source_faces = get_faces(source_data)
+        if source_faces is None or len(source_faces) == 0:
+            return {"msg": "Source Image Detect Failed", "state": 500}
+        source_faces_count = len(source_faces)
+        target_faces_count = 0
 
         if len(target_image) > 0:
             target_img: Image.Image = decode_to_pil(target_image)
             target_data = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
-            target_face = get_face_single(target_data, face_index=0)
-            if target_face is None:
-                return {"msg": "Target Image No Faces", "info": "Failed"}
+            target_faces = get_faces(target_data)
+            if target_faces is None or len(target_faces) == 0:
+                return {"msg": "Target Image Detect Failed", "state": 500}
+            target_faces_count = len(target_faces)
 
-        return {"msg": "Face Detected", "info": "Success"}
+        return {
+            "source_faces_count": source_faces_count,
+            "target_faces_count": target_faces_count,
+            "msg": "Face Detect Success",
+            "state": 200
+        }
 
     @app.post("/roop/swap_face")
     async def roop_swap_face(
@@ -54,13 +62,13 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         nsfw_filter: bool = Body(False, title='Roop NSFW Filter'),
     ):
         if len(source_image) == 0:
-            return {"msg": "No Source Image", "info": "Failed"}
+            return {"msg": "No Source Image", "state": 404}
         if len(target_image) == 0:
-            return {"msg": "No Target Image", "info": "Failed"}
+            return {"msg": "No Target Image", "state": 404}
         if model is None or len(model) == 0:
             model = get_first_model()
         if model is None or len(model) == 0:
-            return {"msg": "No Model", "info": "Failed"}
+            return {"msg": "No Model", "state": 404}
         if upscaler_scale < 1 or upscaler_scale > 8:
             upscaler_scale = 1
         if face_restorer_visibility < 0.0 or face_restorer_visibility > 1.0:
@@ -90,7 +98,11 @@ def roop_api(_: gr.Blocks, app: FastAPI):
             nsfw_filter=nsfw_filter
         )
         result_str = encode_to_base64(result.image())
-        return {"image": result_str, "info": "Success"}
+        return {
+            "image": result_str,
+            "msg": "Swap Face Success",
+            "state": 200
+        }
 
     @app.post("/roop/batch_swap_face")
     async def roop_batch_swap_face(
@@ -106,13 +118,13 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         nsfw_filter: bool = Body(False, title='Roop NSFW Filter'),
     ):
         if len(source_image) == 0:
-            return {"msg": "No Source Image", "info": "Failed"}
+            return {"msg": "No Source Image", "state": 404}
         if len(target_images) == 0:
-            return {"msg": "No Target Images", "info": "Failed"}
+            return {"msg": "No Target Images", "state": 404}
         if model is None or len(model) == 0:
             model = get_first_model()
         if model is None or len(model) == 0:
-            return {"msg": "No Model", "info": "Failed"}
+            return {"msg": "No Model", "state": 404}
         if upscaler_scale < 1 or upscaler_scale > 8:
             upscaler_scale = 1
         if face_restorer_visibility < 0.0 or face_restorer_visibility > 1.0:
@@ -145,7 +157,11 @@ def roop_api(_: gr.Blocks, app: FastAPI):
             )
             result_str = encode_to_base64(result.image())
             result_imgs.append(result_str)
-        return {"images": result_imgs, "info": "Success"}
+        return {
+            "images": result_imgs,
+            "msg": "Swap Face Success",
+            "state": 200
+        }
 
 
 try:

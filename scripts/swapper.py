@@ -84,16 +84,27 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
     return result_image
 
 
+def get_faces(img_data: np.ndarray, det_size=(640, 640)):
+    face_analyser = get_face_analyser(name="buffalo_l", det_size=det_size)
+    faces = face_analyser.get(img_data)
+
+    if len(faces) == 0 and det_size[0] > 320 and det_size[1] > 320:
+        det_size_half = (det_size[0] // 2, det_size[1] // 2)
+        return get_faces(img_data, det_size=det_size_half)
+
+    return faces
+
+
 def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
     face_analyser = get_face_analyser(name="buffalo_l", det_size=det_size)
-    face = face_analyser.get(img_data)
+    faces = face_analyser.get(img_data)
 
-    if len(face) == 0 and det_size[0] > 320 and det_size[1] > 320:
+    if len(faces) == 0 and det_size[0] > 320 and det_size[1] > 320:
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
         return get_face_single(img_data, face_index=face_index, det_size=det_size_half)
 
     try:
-        return sorted(face, key=lambda x: x.bbox[0])[face_index]
+        return sorted(faces, key=lambda x: x.bbox[0])[face_index]
     except IndexError:
         return None
 

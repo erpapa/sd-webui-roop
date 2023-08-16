@@ -24,7 +24,7 @@ class FaceSwapScript(scripts.Script):
         return scripts.AlwaysVisible
 
     def ui(self, is_img2img):
-        with gr.Accordion(f"roop {version_flag}", open=False):
+        with gr.Accordion(f"Roop {version_flag}", open=False):
             with gr.Column():
                 image = gr.inputs.Image(type="pil")
                 enable = gr.Checkbox(False, placeholder="enable", label="Enable")
