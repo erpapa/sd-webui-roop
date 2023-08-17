@@ -3,7 +3,7 @@ import numpy as np
 import gradio as gr
 
 from PIL import Image
-from typing import List
+from typing import List, Any
 from fastapi import FastAPI, Body
 
 from scripts.cimage import get_first_model, find_upscaler, find_face_restorer
@@ -11,6 +11,48 @@ from scripts.cimage import decode_to_pil, encode_to_base64
 from scripts.swapper import UpscaleOptions, ImageResult, swap_face, get_faces
 from scripts.roop_logging import logger
 from scripts.roop_version import version_flag
+
+
+def crop_bbox_image(image: Image.Image, bbox: Any):
+    face_bbox = (bbox[0], bbox[1], bbox[2], bbox[3])
+    face_img = image.crop(face_bbox)
+    face_str = encode_to_base64(face_img)
+
+    face_width = face_bbox[2] - face_bbox[0]
+    face_height = face_bbox[3] - face_bbox[1]
+    square_face_side = min(min(face_width * 2, face_height * 2), min(image.width, image.height))
+    square_face_left = max(face_bbox[0] - (square_face_side - face_width) // 2, 0)
+    square_face_upper = max(face_bbox[1] - (square_face_side - face_height) // 2, 0)
+    if square_face_left + square_face_side > image.width:
+        square_face_side = image.width - square_face_left
+    if square_face_upper + square_face_side > image.height:
+        square_face_side = image.height - square_face_upper
+
+    square_face_left = max(face_bbox[0] - (square_face_side - face_width) // 2, 0)
+    square_face_upper = max(face_bbox[1] - (square_face_side - face_height) // 2, 0)
+    square_face_right = min(square_face_left + square_face_side, image.width)
+    square_face_lower = min(square_face_upper + square_face_side, image.height)
+    square_face_bbox = (square_face_left, square_face_upper, square_face_right, square_face_lower)
+    square_face_img = image.crop(square_face_bbox)
+    square_face_str = encode_to_base64(square_face_img)
+
+    if square_face_img.width != square_face_img.height:
+        background_side = max(square_face_img.width, square_face_img.height)
+        background_left = (background_side - square_face_img.width) // 2
+        background_upper = (background_side - square_face_img.height) // 2
+        background_right = background_left + square_face_img.width
+        background_lower = background_upper + square_face_img.height
+        background_box = (background_left, background_upper, background_right, background_lower)
+        background_img = Image.new("RGB", (background_side, background_side), (255, 255, 255))
+        background_img.paste(square_face_img, background_box)
+        square_face_str = encode_to_base64(background_img)
+
+    return {
+        "bbox": list(face_bbox),
+        "image": face_str,
+        "square_bbox": list(face_bbox),
+        "square_image": square_face_str
+    }
 
 
 def roop_api(_: gr.Blocks, app: FastAPI):
@@ -33,11 +75,9 @@ def roop_api(_: gr.Blocks, app: FastAPI):
 
         source_image_faces = []
         for face in source_faces:
-            box = face.bbox.astype(int)
-            face_box = (box[0], box[1], box[2], box[3])
-            face_img = source_img.crop(face_box)
-            face_str = encode_to_base64(face_img)
-            source_image_faces.append(face_str)
+            bbox = face.bbox.astype(int)
+            result = crop_bbox_image(source_image, bbox)
+            source_image_faces.append(result)
         if target_image is None or len(target_image) == 0:
             return {
                 "source_image_faces": source_image_faces,
@@ -53,11 +93,9 @@ def roop_api(_: gr.Blocks, app: FastAPI):
 
         target_image_faces = []
         for face in target_faces:
-            box = face.bbox.astype(int)
-            face_box = (box[0], box[1], box[2], box[3])
-            face_img = source_img.crop(face_box)
-            face_str = encode_to_base64(face_img)
-            target_image_faces.append(face_str)
+            bbox = face.bbox.astype(int)
+            result = crop_bbox_image(source_image, bbox)
+            target_image_faces.append(result)
         return {
             "source_image_faces": source_image_faces,
             "target_image_faces": target_image_faces,
