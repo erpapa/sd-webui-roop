@@ -14,7 +14,7 @@ from scripts.roop_version import version_flag
 
 
 def crop_bbox_image(image: Image.Image, bbox: Any):
-    face_bbox = (bbox[0], bbox[1], bbox[2], bbox[3])
+    face_bbox = (int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3]))
     face_img = image.crop(face_bbox)
     face_str = encode_to_base64(face_img)
 
@@ -50,7 +50,7 @@ def crop_bbox_image(image: Image.Image, bbox: Any):
     return {
         "bbox": list(face_bbox),
         "image": face_str,
-        "square_bbox": list(face_bbox),
+        "square_bbox": list(square_face_bbox),
         "square_image": square_face_str
     }
 
