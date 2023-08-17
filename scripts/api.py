@@ -30,20 +30,37 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         source_faces = get_faces(source_data)
         if source_faces is None or len(source_faces) == 0:
             return {"msg": "Source Image Detect Failed", "state": 500}
-        source_faces_count = len(source_faces)
-        target_faces_count = 0
 
-        if len(target_image) > 0:
-            target_img: Image.Image = decode_to_pil(target_image)
-            target_data = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
-            target_faces = get_faces(target_data)
-            if target_faces is None or len(target_faces) == 0:
-                return {"msg": "Target Image Detect Failed", "state": 500}
-            target_faces_count = len(target_faces)
+        source_image_faces = []
+        for face in source_faces:
+            box = face.bbox.astype(int)
+            face_box = (box[0], box[1], box[2], box[3])
+            face_img = source_img.crop(face_box)
+            face_str = encode_to_base64(face_img)
+            source_image_faces.append(face_str)
+        if target_image is None or len(target_image) == 0:
+            return {
+                "source_image_faces": source_image_faces,
+                "msg": "Face Detect Success",
+                "state": 200
+            }
 
+        target_img: Image.Image = decode_to_pil(target_image)
+        target_data = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
+        target_faces = get_faces(target_data)
+        if target_faces is None or len(target_faces) == 0:
+            return {"msg": "Target Image Detect Failed", "state": 500}
+
+        target_image_faces = []
+        for face in target_faces:
+            box = face.bbox.astype(int)
+            face_box = (box[0], box[1], box[2], box[3])
+            face_img = source_img.crop(face_box)
+            face_str = encode_to_base64(face_img)
+            target_image_faces.append(face_str)
         return {
-            "source_faces_count": source_faces_count,
-            "target_faces_count": target_faces_count,
+            "source_image_faces": source_image_faces,
+            "target_image_faces": target_image_faces,
             "msg": "Face Detect Success",
             "state": 200
         }
