@@ -76,7 +76,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         source_image_faces = []
         for face in source_faces:
             bbox = face.bbox.astype(int)
-            result = crop_bbox_image(source_image, bbox)
+            result = crop_bbox_image(source_img, bbox)
             source_image_faces.append(result)
         if target_image is None or len(target_image) == 0:
             return {
@@ -94,7 +94,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
         target_image_faces = []
         for face in target_faces:
             bbox = face.bbox.astype(int)
-            result = crop_bbox_image(source_image, bbox)
+            result = crop_bbox_image(target_img, bbox)
             target_image_faces.append(result)
         return {
             "source_image_faces": source_image_faces,
