@@ -92,10 +92,7 @@ def get_faces(img_data: np.ndarray, det_size=(640, 640)):
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
         return get_faces(img_data, det_size=det_size_half)
 
-    try:
-        return sorted(faces, key=lambda x: x.bbox[0])
-    except IndexError:
-        return None
+    return sorted(faces, key=lambda x: x.bbox[0])
 
 
 def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
