@@ -14,9 +14,9 @@ from scripts.cimage import detect_image, decode_to_pil
 from scripts.roop_logging import logger
 
 CURRENT_FS_MODEL = None
-CURRENT_FS_MODEL_PATH = None
-FACE_MODEL_NAME = None
+CURRENT_FS_MODEL_PATH = ""
 FACE_ANALYSER = None
+FACE_ANALYSER_NAME = ""
 FACE_DET_SIZE = (0, 0)
 PROVIDERS = ['CUDAExecutionProvider', 'CPUExecutionProvider']
 
@@ -31,9 +31,9 @@ class UpscaleOptions:
 
 
 def get_face_swap_model(model_path: str):
-    global CURRENT_FS_MODEL
     global CURRENT_FS_MODEL_PATH
-    if CURRENT_FS_MODEL_PATH is None or CURRENT_FS_MODEL_PATH != model_path:
+    global CURRENT_FS_MODEL
+    if CURRENT_FS_MODEL is None or CURRENT_FS_MODEL_PATH != model_path:
         CURRENT_FS_MODEL_PATH = model_path
         CURRENT_FS_MODEL = insightface.model_zoo.get_model(model_path, providers=PROVIDERS)
 
@@ -41,15 +41,20 @@ def get_face_swap_model(model_path: str):
 
 
 def get_face_analyser(name: str, det_size: tuple):
-    global FACE_MODEL_NAME
+    global FACE_ANALYSER_NAME
     global FACE_ANALYSER
     global FACE_DET_SIZE
-    if FACE_MODEL_NAME is None or FACE_MODEL_NAME != name:
-        FACE_MODEL_NAME = name
+    if FACE_ANALYSER is None or FACE_ANALYSER_NAME != name:
+        FACE_ANALYSER_NAME = name
         FACE_ANALYSER = insightface.app.FaceAnalysis(name=name, providers=PROVIDERS)
-    if FACE_DET_SIZE[0] != det_size[0] or FACE_DET_SIZE[1] != det_size[1]:
-        FACE_DET_SIZE = det_size
-        FACE_ANALYSER.prepare(ctx_id=0, det_size=det_size)
+
+    if FACE_ANALYSER is not None:
+        if FACE_DET_SIZE[0] != det_size[0] or FACE_DET_SIZE[1] != det_size[1]:
+            FACE_DET_SIZE = det_size
+            FACE_ANALYSER.prepare(ctx_id=0, det_size=det_size)
+        if len(FACE_ANALYSER.models) == 0:
+            FACE_DET_SIZE = (0, 0)
+            FACE_ANALYSER = None
 
     return FACE_ANALYSER
 
@@ -86,8 +91,9 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
 
 def get_faces(img_data: np.ndarray, det_size=(640, 640)):
     face_analyser = get_face_analyser(name="buffalo_l", det_size=det_size)
+    if face_analyser is None:
+        return None
     faces = face_analyser.get(img_data)
-
     if len(faces) == 0 and det_size[0] > 320 and det_size[1] > 320:
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
         return get_faces(img_data, det_size=det_size_half)
@@ -97,12 +103,12 @@ def get_faces(img_data: np.ndarray, det_size=(640, 640)):
 
 def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
     face_analyser = get_face_analyser(name="buffalo_l", det_size=det_size)
+    if face_analyser is None:
+        return None
     faces = face_analyser.get(img_data)
-
     if len(faces) == 0 and det_size[0] > 320 and det_size[1] > 320:
         det_size_half = (det_size[0] // 2, det_size[1] // 2)
         return get_face_single(img_data, face_index=face_index, det_size=det_size_half)
-
     try:
         return sorted(faces, key=lambda x: x.bbox[0])[face_index]
     except IndexError:
@@ -145,11 +151,11 @@ def swap_face(
         source_img = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
         target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
         source_face = get_face_single(source_img, face_index=0)
-        if source_face is not None:
-            result = target_img
-            model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
-            face_swapper = get_face_swap_model(model_path)
 
+        model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
+        face_swapper = get_face_swap_model(model_path)
+        if source_face is not None and face_swapper is not None:
+            result = target_img
             for face_num in faces_index:
                 target_face = get_face_single(target_img, face_index=face_num)
                 if target_face is not None:
