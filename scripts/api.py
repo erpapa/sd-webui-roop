@@ -67,7 +67,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
     ):
         if len(source_image) == 0:
             return {"msg": "No Source Image", "state": 404}
-        source_img: Image.Image = decode_to_pil(source_image)
+        source_img: Image.Image = decode_to_pil(source_image).convert("RGB")
         source_data = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
         source_faces = get_faces(source_data)
         if source_faces is None or len(source_faces) == 0:
@@ -85,7 +85,7 @@ def roop_api(_: gr.Blocks, app: FastAPI):
                 "state": 200
             }
 
-        target_img: Image.Image = decode_to_pil(target_image)
+        target_img: Image.Image = decode_to_pil(target_image).convert("RGB")
         target_data = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
         target_faces = get_faces(target_data)
         if target_faces is None or len(target_faces) == 0:
@@ -142,8 +142,8 @@ def roop_api(_: gr.Blocks, app: FastAPI):
                                          upscale_visibility=upscaler_visibility,
                                          face_restorer=find_face_restorer(face_restorer_name),
                                          restorer_visibility=face_restorer_visibility)
-        source_img: Image.Image = decode_to_pil(source_image)
-        target_img: Image.Image = decode_to_pil(target_image)
+        source_img: Image.Image = decode_to_pil(source_image).convert("RGB")
+        target_img: Image.Image = decode_to_pil(target_image).convert("RGB")
         result: ImageResult = swap_face(
             source_img=source_img,
             target_img=target_img,
@@ -198,10 +198,10 @@ def roop_api(_: gr.Blocks, app: FastAPI):
                                          upscale_visibility=upscaler_visibility,
                                          face_restorer=find_face_restorer(face_restorer_name),
                                          restorer_visibility=face_restorer_visibility)
-        source_img: Image.Image = decode_to_pil(source_image)
+        source_img: Image.Image = decode_to_pil(source_image).convert("RGB")
         result_imgs: List = []
         for img_str in target_images:
-            target_img: Image.Image = decode_to_pil(img_str)
+            target_img: Image.Image = decode_to_pil(img_str).convert("RGB")
             result: ImageResult = swap_face(
                 source_img=source_img,
                 target_img=target_img,
